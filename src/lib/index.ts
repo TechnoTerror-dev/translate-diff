@@ -1,4 +1,5 @@
 import { Command } from 'commander';
+import { existsSync } from 'fs';
 import * as path from 'path';
 import { TranslateDiffService } from './service/translateDiff.service.js';
 import type { ITranslateDiffConfig } from './type/type.js';
@@ -12,46 +13,89 @@ export async function runCli(): Promise<void> {
     .option('-f, --files <files...>', 'Paths to files to translate')
     .option('-l, --lang <lang>', 'Base language')
     .option('-k, --api-key <apiKey>', 'OpenAI API key')
-    .option('-p, --proxy <proxy>', 'HTTPS proxy URL')
     .option(
       '-c, --config <config>',
-      'Path to config file. If options are set, they override config.',
+      'Path to config file. If not provided, will look for translate-diff.config.js in project root',
     );
 
   program.action(async (options) => {
-    let config: ITranslateDiffConfig | null = null;
+    let config: ITranslateDiffConfig;
 
-    if (options.main && options.files && options.lang && options.apiKey && options.proxy) {
-      config = {
-        main: options.main,
-        files: options.files,
-        lang: options.lang,
-        apiKey: options.apiKey,
-        proxy: options.proxy,
-      };
-    } else if (options.config) {
-      const configPath = path.resolve(process.cwd(), options.config);
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const loadedConfig = require(configPath).default;
-      if (!isValidConfigUtil(loadedConfig)) {
-        console.error('Error: loaded config is invalid by type signature');
+    // Попробуем найти конфиг файл автоматически
+    let configPath: string;
+
+    if (options.config) {
+      // Если путь указан явно
+      configPath = path.resolve(process.cwd(), options.config);
+    } else {
+      // Ищем стандартные имена конфиг файлов
+      const possibleConfigNames = [
+        'translate-diff.config.js',
+        'translate-diff.config.mjs',
+        'translate-diff.config.cjs',
+        'translate-diff.config.json',
+        '.translate-diff.js',
+        '.translate-diff.mjs',
+        '.translate-diff.cjs',
+        '.translate-diff.json',
+      ];
+
+      configPath = '';
+      for (const configName of possibleConfigNames) {
+        const testPath = path.resolve(process.cwd(), configName);
+        if (existsSync(testPath)) {
+          configPath = testPath;
+          break;
+        }
+      }
+
+      if (!configPath) {
+        console.error(
+          'Error: No config file found. Please create a config file or specify with -c option.',
+        );
+        console.error('Expected config files:');
+        possibleConfigNames.forEach((name) => console.error(`  - ${name}`));
         process.exit(1);
       }
-      config = loadedConfig;
     }
 
-    if (!config || !isValidConfigUtil(config)) {
-      console.error(
-        'Error: insufficient or invalid parameters. Provide all required options (including proxy) or a valid config file.',
-      );
+    console.log(`Using config: ${configPath}`);
+
+    if (!existsSync(configPath)) {
+      console.error(`Config file not found: ${configPath}`);
+      process.exit(1);
+    }
+
+    try {
+      let configModule;
+      if (configPath.endsWith('.json')) {
+        // Для JSON файлов используем readFileSync
+        const fs = await import('fs/promises');
+        const jsonContent = await fs.readFile(configPath, 'utf-8');
+        configModule = JSON.parse(jsonContent);
+      } else {
+        // Для JS файлов
+        configModule = await import(configPath);
+      }
+
+      config = configModule.default || configModule;
+
+      console.log('Loaded config:', config);
+
+      if (!isValidConfigUtil(config)) {
+        console.error('Invalid config structure');
+        process.exit(1);
+      }
+    } catch (error) {
+      console.error('Error loading config:', error);
       process.exit(1);
     }
 
     const service = new TranslateDiffService();
     await service.process(config);
-
-    console.log('Translation diff processed successfully.');
+    console.log('Translation completed successfully');
   });
+
   await program.parseAsync(process.argv);
 }
 

@@ -3,7 +3,6 @@ interface ITranslateDiffConfig {
   files: string[];
   lang: string;
   apiKey: string;
-  proxy: string;
 }
 
 export type { ITranslateDiffConfig };

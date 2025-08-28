@@ -11,6 +11,9 @@ export class TranslateDiffService {
     for (const filePath of config.files) {
       const targetJson = await FileUtil.readJson(filePath);
 
+      // Extract language from filename (e.g., "en-US.json" -> "en-US")
+      const language = this.extractLanguageFromFilename(filePath);
+
       // Find missing or untranslated keys
       const missingEntries = DeepDiffUtil.findMissingOrUntranslated(baseJson, targetJson);
 
@@ -19,15 +22,29 @@ export class TranslateDiffService {
         continue;
       }
 
-      // Translate all missing values
-      const apiService = new TranslationApiService(config.apiKey, config.proxy, config.lang);
+      // Translate missing values to the specific language
+      const apiService = new TranslationApiService(config.apiKey, language);
       const translated = await apiService.translateObject(missingEntries);
 
       // Merge existing with new
       const merged = DeepDiffUtil.deepMerge(targetJson, translated);
 
       await FileUtil.writeJson(filePath, merged);
-      console.log(`[${filePath}]: Added ${Object.keys(missingEntries).length} missing keys.`);
+      console.log(
+        `[${filePath}]: Added ${Object.keys(missingEntries).length} missing keys in language: ${language}`,
+      );
     }
+  }
+
+  // Extract language code from filename
+  private extractLanguageFromFilename(filePath: string): string {
+    const filename = filePath.split('/').pop() || ''; // Get filename with extension
+    const languageCode = filename.replace('.json', ''); // Remove .json extension
+
+    if (!languageCode) {
+      throw new Error(`Could not extract language from filename: ${filePath}`);
+    }
+
+    return languageCode;
   }
 }

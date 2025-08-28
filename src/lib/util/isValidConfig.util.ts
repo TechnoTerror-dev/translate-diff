@@ -8,7 +8,6 @@ export function isValidConfigUtil(config: unknown): config is ITranslateDiffConf
     Array.isArray(c.files) &&
     c.files.every((f) => typeof f === 'string') &&
     typeof c.lang === 'string' &&
-    typeof c.apiKey === 'string' &&
-    typeof c.proxy === 'string'
+    typeof c.apiKey === 'string'
   );
 }
