@@ -26,6 +26,8 @@
   "type": "module",
   "dependencies": {
     "commander": "^14.0.0",
+    "dotenv": "^17.2.1",
+    "https-proxy-agent": "^7.0.6",
     "node-fetch": "^3.3.2"
   },
   "devDependencies": {
@@ -40,6 +42,7 @@
     "jiti": "^2.5.1",
     "prettier": "^3.6.2",
     "ts-jest": "^29.4.1",
+    "ts-node": "^10.9.2",
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.41.0"
   }
